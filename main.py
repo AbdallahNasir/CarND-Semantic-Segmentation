@@ -60,24 +60,30 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     """
     # TODO: Implement function
     conv_1x1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, padding='SAME',
-                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+     kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
     
     output = tf.layers.conv2d_transpose(conv_1x1, num_classes, kernel_size= 4,strides=(2,2), padding='SAME', 
-                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+     kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
     vgg_layer4_out_2 = tf.layers.conv2d(vgg_layer4_out, num_classes, 1, padding='SAME',
-                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+     kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
     output = tf.add(output, vgg_layer4_out_2)
     
     output = tf.layers.conv2d_transpose(output, num_classes, 4,2, padding='SAME', 
-                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+     kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
 
     vgg_layer3_out_2 = tf.layers.conv2d(vgg_layer3_out, num_classes, 1, padding='SAME',
-                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+                                kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+     kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
 
     output = tf.add(output, vgg_layer3_out_2)
     
     output = tf.layers.conv2d_transpose(output, num_classes, 16,8, padding='SAME', 
-                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
+                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+     kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
 
     return output
 tests.test_layers(layers)
@@ -97,12 +103,16 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
     
     logits = tf.reshape(nn_last_layer, (-1, num_classes))
     correct_label_shaped =  tf.reshape(correct_label, (-1, num_classes))
+    
+    l2_loss = sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
+    
+    
     cross_entropy_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=correct_label_shaped))
+    loss = tf.reduce_mean(cross_entropy_loss + l2_loss)
+    train_op = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 
-    train_op = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy_loss)
 
-
-    return logits, train_op, cross_entropy_loss
+    return logits, train_op, loss
 tests.test_optimize(optimize)
 
 
@@ -128,7 +138,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
         for images, labels in get_batches_fn(batch_size):
             
             _, loss = sess.run([train_op, cross_entropy_loss], feed_dict= 
-                     {input_image : images, correct_label: labels, keep_prob: 0.7,learning_rate: 0.0005})
+                     {input_image : images, correct_label: labels, keep_prob: 0.7,learning_rate: 1e-4})
             totalloss += loss * len(labels)
             totalimages += len(labels)
         print ("%d / %d : Loss is %f" % (epoch, epochs, (totalloss / totalimages)))
@@ -172,7 +182,7 @@ def run():
         sess.run(tf.global_variables_initializer())
         # TODO: Train NN using the train_nn function
         epochs = 50
-        batch_size = 14
+        batch_size = 8
         
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image,
              correct_label, keep_prob, learning_rate)
